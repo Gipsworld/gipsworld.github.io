@@ -1618,6 +1618,77 @@ const bQuote = document.getElementById('bQuote');
 const bMemo = document.getElementById('bMemo');
 const bEssay = document.getElementById('bEssay');
 const bLink = document.getElementById('bLink');
+const bEnd = document.getElementById('bEnd');
+const bEndWrap = document.getElementById('bEndWrap');
+const bDateLabel = document.getElementById('bDateLabel');
+const bStarRow = document.getElementById('bStarRow');
+
+/* 책 별점 고르기 (영화와 같은 모양 · 0이면 아직 안 매김) */
+let bookStar = 0;
+const bookPick = document.getElementById('bStarPick');
+const bookStarValue = document.getElementById('bStarValue');
+const bookSlots = [];
+for (let i = 1; i <= 5; i++) {
+  const slot = makeStar(0);
+  [i - 0.5, i].forEach((v, side) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'half ' + (side === 0 ? 'l' : 'r');
+    b.dataset.v = v;
+    b.setAttribute('aria-label', v + '점');
+    b.addEventListener('click', () => setBookStar(v));
+    b.addEventListener('mouseenter', () => paintBookStar(v));
+    b.addEventListener('focus', () => paintBookStar(v));
+    slot.appendChild(b);
+  });
+  bookSlots.push(slot);
+  bookPick.appendChild(slot);
+}
+bookPick.addEventListener('mouseleave', () => paintBookStar(bookStar));
+bookPick.addEventListener('focusout', () => paintBookStar(bookStar));
+// 반 개는 별을 반만 칠하는 대신 노란 ☆(빈 별)로 보여 줘요
+function paintBookStar(v) {
+  bookSlots.forEach((slot, i) => {
+    const f = Math.max(0, Math.min(1, v - i));
+    const half = f > 0 && f < 1;
+    slot.querySelector('.star-fill').style.width = f >= 1 ? '100%' : '0%';
+    slot.querySelector('.star-bg').textContent = half ? '☆' : '★';
+    slot.classList.toggle('is-half', half);
+  });
+  bookStarValue.textContent = v ? v.toFixed(1) : '-';
+}
+// 카드용 별점 글자: 4.5 → ★★★★☆ (빈 별은 안 그려요)
+function bookStars(v) {
+  const s = document.createElement('span');
+  s.className = 'bk-stars';
+  s.textContent = '★'.repeat(Math.floor(v)) + (v % 1 ? '☆' : '');
+  s.setAttribute('aria-label', `별점 ${v}점`);
+  return s;
+}
+function setBookStar(v) {
+  bookStar = v;
+  paintBookStar(v);
+  bookPick.querySelectorAll('.half').forEach(b => b.setAttribute('aria-pressed', Number(b.dataset.v) === v));
+}
+document.getElementById('bStarClear').addEventListener('click', () => setBookStar(0));
+
+// 상태에 따라 날짜 이름과 칸을 바꿔요 (읽고 싶음: 담은 날 / 다 읽음: 다 읽은 날 칸이 생겨요)
+function syncBookStatus(changed) {
+  const s = bStatus.value;
+  bDateLabel.textContent = s === 'wish' ? '담은 날' : '읽기 시작한 날';
+  bEndWrap.hidden = s !== 'done';
+  bStarRow.hidden = s === 'wish';
+  if (changed && s === 'done' && !bEnd.value) bEnd.value = ymd(new Date());   // 방금 다 읽었다면 오늘로
+}
+bStatus.addEventListener('change', () => syncBookStatus(true));
+
+// 카드에 보일 독서 기간 (예: 2026.11.21 ~ 읽는 중 / 2026.11.21 ~ 2026.12.01)
+function bookPeriod(b) {
+  if (b.status === 'wish') return b.date ? `담은 날 ${dot(b.date)}` : '';
+  if (b.status === 'reading') return b.date ? `${dot(b.date)} ~ 읽는 중` : '읽는 중';
+  if (b.date && b.end && b.end !== b.date) return `${dot(b.date)} ~ ${dot(b.end)}`;
+  return dot(b.end || b.date);
+}
 
 // 서점 검색 주소 (제목 + 지은이로 찾아요)
 const BOOK_STORES = {
@@ -1702,17 +1773,27 @@ function renderBookDetail() {
   card.className = 'bk-card';
   card.style.setProperty('--c', SPINE_COLORS[b.id % SPINE_COLORS.length]);
   card.innerHTML = `
-    <div class="bk-top"><span class="bk-status"></span><span class="bk-date"></span></div>
+    <div class="bk-top">
+      <span class="bk-status"></span>
+      <span class="bk-top-right">
+        <span class="bk-date"></span>
+        <button type="button" class="bk-close" aria-label="카드 닫기" title="닫기">✕</button>
+      </span>
+    </div>
     <div class="bk-head">
       <div class="bk-cover"></div>
       <div class="bk-info">
         <h4 class="bk-title"></h4>
         <p class="bk-author"></p>
+        <p class="bk-rating"></p>
         <div class="bk-links"></div>
       </div>
     </div>
     <blockquote class="bk-quote"></blockquote>
-    <p class="bk-memo"></p>
+    <div class="bk-memo-box">
+      <p class="bk-memo-label">✎ 메모</p>
+      <p class="bk-memo"></p>
+    </div>
     <div class="bk-essay">
       <p class="bk-essay-label">📝 감상문</p>
       <p class="bk-essay-preview"></p>
@@ -1723,7 +1804,17 @@ function renderBookDetail() {
       <button type="button" class="mini-btn" data-act="del">삭제</button>
     </div>`;
   card.querySelector('.bk-status').textContent = BOOK_STATUS[b.status];
-  card.querySelector('.bk-date').textContent = dot(b.date);
+  card.querySelector('.bk-date').textContent = bookPeriod(b);
+  card.querySelector('.bk-close').addEventListener('click', () => { bookSelected = null; renderBooks(); });
+  // 별점: 매긴 책만 (읽고 싶은 책은 보이지 않아요)
+  const rating = card.querySelector('.bk-rating');
+  if (b.star && b.status !== 'wish') {
+    rating.appendChild(bookStars(Number(b.star)));
+    const num = document.createElement('span');
+    num.className = 'bk-rating-num';
+    num.textContent = Number(b.star).toFixed(1);
+    rating.appendChild(num);
+  } else rating.remove();
   card.querySelector('.bk-title').textContent = b.title;
   card.querySelector('.bk-author').textContent = b.author ? `${b.author} 지음` : '';
 
@@ -1766,7 +1857,9 @@ function renderBookDetail() {
 
   const q = card.querySelector('.bk-quote');
   if (b.quote) q.textContent = b.quote; else q.remove();
-  card.querySelector('.bk-memo').textContent = b.memo;
+  // 메모: 적은 게 있을 때만 '✎ 메모' 라벨과 함께
+  if (b.memo) card.querySelector('.bk-memo').textContent = b.memo;
+  else card.querySelector('.bk-memo-box').remove();
   // 감상문: 앞부분만 미리 보여 주고, 전체는 읽기 창에서
   const essayBox = card.querySelector('.bk-essay');
   if (b.essay) {
@@ -1774,7 +1867,7 @@ function renderBookDetail() {
     essayBox.querySelector('.essay-btn').addEventListener('click', () => openReader({
       kind: 'BOOK REVIEW',
       title: b.title,
-      sub: [b.author && `${b.author} 지음`, BOOK_STATUS[b.status], dot(b.date)].filter(Boolean).join('  ·  '),
+      sub: [b.author && `${b.author} 지음`, BOOK_STATUS[b.status], b.star && b.status !== 'wish' && `★ ${Number(b.star).toFixed(1)}`, bookPeriod(b)].filter(Boolean).join('  ·  '),
       text: b.essay
     }));
   } else essayBox.remove();
@@ -1800,6 +1893,9 @@ function openBookForm(b) {
   bMemo.value = b ? b.memo : '';
   bEssay.value = b ? (b.essay || '') : '';
   bLink.value = b ? (b.link || '') : '';
+  bEnd.value = b ? (b.end || '') : '';
+  setBookStar(b ? (Number(b.star) || 0) : 0);
+  syncBookStatus(false);
   setCoverDraft(b ? draftFromBook(b) : null);
   updateCount(bEssay);
   bookForm.hidden = false;
@@ -1819,9 +1915,12 @@ bookForm.addEventListener('submit', (e) => {
   const data = {
     title: bTitle.value.trim(), author: bAuthor.value.trim(), status: bStatus.value,
     date: bDate.value, quote: bQuote.value.trim(), memo: bMemo.value.trim(),
-    essay: bEssay.value.trim(), link: normalizeUrl(bLink.value)
+    essay: bEssay.value.trim(), link: normalizeUrl(bLink.value),
+    end: bStatus.value === 'done' ? bEnd.value : '',
+    star: bStatus.value === 'wish' ? 0 : bookStar
   };
   if (!data.title) return;
+  if (data.end && data.date && data.end < data.date) { alert('다 읽은 날이 읽기 시작한 날보다 빨라요. 날짜를 확인해 주세요.'); bEnd.focus(); return; }
   if (data.link === null) { alert('책 링크 주소가 올바르지 않아요. https:// 로 시작하는 주소를 붙여 넣어 주세요.'); bLink.focus(); return; }
   if (bookEditingId) {
     data.cover = commitBookCover(bookEditingId);

@@ -807,6 +807,7 @@ button:focus-visible, input:focus-visible { outline: 2px dashed var(--blue-deep)
 .bk-essay-label { font-family: var(--pixel); font-size: 11px; color: var(--c); }
 .bk-essay-preview {
   font-size: 14px;
+  line-height: 1.85;
   white-space: pre-wrap;
   word-break: keep-all;
   margin: 4px 0 6px;
@@ -1200,14 +1201,14 @@ button:focus-visible, input:focus-visible { outline: 2px dashed var(--blue-deep)
 .bk-head { display: flex; gap: 14px; align-items: flex-start; margin-top: 8px; }
 .bk-head .bk-title { margin-top: 0; }
 .bk-info { flex: 1; min-width: 0; }
+/* 표지: 테두리 없이 은은한 그림자만 (진짜 책처럼) */
 .bk-cover {
   flex-shrink: 0;
   width: 84px;
   aspect-ratio: 2 / 3;
-  border-radius: 3px 6px 6px 3px;
+  border-radius: 2px 5px 5px 2px;
   overflow: hidden;
-  background: #f4efe6;
-  box-shadow: inset 4px 0 0 rgba(0, 0, 0, .12), 2px 3px 0 var(--line);
+  box-shadow: 0 2px 4px rgba(74, 63, 54, .18), 0 6px 14px rgba(74, 63, 54, .14);
 }
 .bk-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .bk-cover.blank {
@@ -1223,8 +1224,47 @@ button:focus-visible, input:focus-visible { outline: 2px dashed var(--blue-deep)
   text-align: center;
   word-break: keep-all;
 }
-.bk-links { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: 8px; }
-.bk-links-label { font-size: 11px; color: var(--ink-soft); }
+.bk-links { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
+.bk-links-label { font-size: 11px; color: var(--ink-soft); margin-right: 2px; }
+/* 서점 링크: 누를 수 있게 생긴 작은 알약 버튼 */
+.bk-links .movie-link {
+  display: inline-block;
+  padding: 2px 10px;
+  font-size: 12px;
+  border: 1px solid var(--blue);
+  border-radius: 999px;
+  background: var(--blue-soft);
+  white-space: nowrap;
+  transition: background .15s, color .15s;
+}
+.bk-links .movie-link:hover { background: var(--blue-deep); border-color: var(--blue-deep); color: #fff; }
+.bk-links .movie-link.soft { background: #fff; border-color: var(--line); color: var(--ink-soft); }
+.bk-links .movie-link.soft:hover { background: var(--blue-soft); border-color: var(--blue); color: var(--blue-deep); }
+
+/* 카드 위쪽 오른편: 기간 + 닫기 */
+.bk-top-right { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.bk-close {
+  flex-shrink: 0;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--ink-soft);
+  border: 1px solid var(--line);
+  background: #fff;
+}
+.bk-close:hover { color: #fff; background: var(--c); border-color: var(--c); }
+
+/* 별점 (매긴 책만) */
+.bk-rating { display: flex; align-items: center; gap: 6px; margin-top: 2px; font-size: 15px; }
+.bk-rating-num { font-family: var(--pixel); font-size: 12px; color: #d99a1e; }
+.bk-stars { color: #f0b53c; letter-spacing: 1px; line-height: 1; }
+/* 책 별점 고르기: 반 개는 노란 ☆ */
+.star.is-half .star-bg { color: #f0b53c; }
+
+/* 메모: 라벨 + 내용 */
+.bk-memo-box { margin-top: 8px; }
+.bk-memo-label { font-family: var(--pixel); font-size: 11px; color: var(--c); margin-bottom: 2px; }
 
 /* 책 쓰기 칸의 '서점에서 찾기' 줄 */
 .store-search { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-size: 12px; color: var(--ink-soft); }
@@ -1240,6 +1280,7 @@ button:focus-visible, input:focus-visible { outline: 2px dashed var(--blue-deep)
   background: var(--blue-soft);
   border-radius: 8px;
   font-size: 15px;
+  line-height: 1.8;
   white-space: pre-wrap;
   word-break: keep-all;
 }
@@ -1251,7 +1292,7 @@ button:focus-visible, input:focus-visible { outline: 2px dashed var(--blue-deep)
   font-size: 34px;
   color: var(--blue-deep);
 }
-.bk-memo { font-size: 14px; color: var(--ink-soft); white-space: pre-wrap; word-break: keep-all; }
+.bk-memo { font-size: 14px; line-height: 1.8; color: var(--ink-soft); white-space: pre-wrap; word-break: keep-all; }
 
 /* ---------------- TRAVEL ---------------- */
 .map-wrap { position: relative; }

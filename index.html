@@ -363,7 +363,14 @@
               </div>
               <div class="form-row">
                 <label>상태 <select id="bStatus"></select></label>
-                <label>날짜 <input type="date" id="bDate"></label>
+                <label><span id="bDateLabel">읽기 시작한 날</span> <input type="date" id="bDate"></label>
+                <label id="bEndWrap" hidden>다 읽은 날 <input type="date" id="bEnd"></label>
+              </div>
+              <div class="form-row star-row" id="bStarRow">
+                <span>별점</span>
+                <div class="star-pick" id="bStarPick" aria-label="책 별점 고르기 (별의 왼쪽 반 = 0.5점)"></div>
+                <span class="star-value" id="bStarValue">-</span>
+                <button type="button" class="mini-btn" id="bStarClear">지우기</button>
               </div>
               <textarea id="bQuote" rows="2" placeholder="밑줄 그은 한 문장"></textarea>
               <textarea id="bMemo" rows="3" placeholder="읽고 난 생각, 짧은 메모"></textarea>
