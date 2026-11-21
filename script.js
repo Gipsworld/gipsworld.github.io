@@ -3055,7 +3055,18 @@ function applyMovieInfo(info, force) {
 const TMDB_API = 'https://api.themoviedb.org/3';
 const TMDB_IMG = 'https://image.tmdb.org/t/p/w500';
 const HANGUL = /[가-힣]/;
-const tmdbKey = () => store.get('gip_tmdb_key', '').trim();
+// TMDB 키: 주인장으로 로그인했으면 Supabase '비밀 칸'에서, 아니면 이 브라우저에서 꺼내요
+// (비밀 칸은 주인장만 읽을 수 있어서 공개되지 않아요)
+const TMDB_KEY_NAME = 'gip_tmdb_key';
+const useSecretTmdb = () => !!(CLOUD && CLOUD.secretsAvailable && CLOUD.secretsAvailable());
+const tmdbKey = () => ((useSecretTmdb() && CLOUD.getSecret(TMDB_KEY_NAME)) || store.get(TMDB_KEY_NAME, '')).trim();
+// 키 바꾸기: persist가 true면 비밀 칸에도 저장해요 (어느 기기에서 로그인해도 그대로)
+async function setTmdbKey(key, persist) {
+  store.set(TMDB_KEY_NAME, key);
+  if (!useSecretTmdb()) return;
+  if (persist) await CLOUD.setSecret(TMDB_KEY_NAME, key);
+  else CLOUD.peekSecret(TMDB_KEY_NAME, key);
+}
 
 // TMDB에 묻기 ('API 읽기 액세스 토큰'은 eyJ로 시작하고, 'API 키'는 32글자예요. 둘 다 돼요)
 async function tmdbFetch(path, params = {}) {
@@ -3180,8 +3191,8 @@ tmdbToggle.addEventListener('click', () => {
   if (!tmdbBox.hidden) tmdbKeyInput.focus();
 });
 document.getElementById('tmdbCloseBtn').addEventListener('click', () => { tmdbBox.hidden = true; });
-document.getElementById('tmdbRemoveBtn').addEventListener('click', () => {
-  store.set('gip_tmdb_key', '');
+document.getElementById('tmdbRemoveBtn').addEventListener('click', async () => {
+  try { await setTmdbKey('', true); } catch (e) { tmdbMsg.textContent = '온라인 비밀 칸에서 지우지 못했어요. 잠시 후 다시 눌러 주세요.'; return; }
   refreshTmdbToggle();
   tmdbMsg.textContent = '연결을 끊었어요. 이제 자동 채우기는 위키데이터만 써요.';
 });
@@ -3189,22 +3200,32 @@ document.getElementById('tmdbSaveBtn').addEventListener('click', async () => {
   const key = tmdbKeyInput.value.trim();
   if (!key) { tmdbMsg.textContent = '키를 먼저 붙여 넣어 주세요.'; return; }
   const prev = tmdbKey();
-  store.set('gip_tmdb_key', key);
+  await setTmdbKey(key, false);   // 먼저 이 키로 시험만 해 봐요
   tmdbMsg.textContent = '🔎 키가 맞는지 확인하는 중…';
   try {
     await tmdbFetch('/configuration');   // 키가 맞으면 답이 와요
-    tmdbKeyInput.value = '';
-    refreshTmdbToggle();
-    tmdbMsg.textContent = '✔ 연결됐어요! 이제 ✨ 정보 자동 채우기가 TMDB를 먼저 써요.';
-    setTimeout(() => { tmdbBox.hidden = true; }, 1800);
   } catch (e) {
-    store.set('gip_tmdb_key', prev);   // 실패하면 예전 상태로 되돌려요
+    await setTmdbKey(prev, false);   // 실패하면 예전 상태로 되돌려요
     refreshTmdbToggle();
     tmdbMsg.textContent = e.name === 'KeyError'
       ? '🔑 키가 맞지 않아요. 앞뒤 빈칸 없이 키 전체를 복사했는지 확인해 주세요.'
       : '확인하지 못했어요. 인터넷 연결을 확인하고 다시 눌러 주세요.';
+    return;
   }
+  // 맞는 키면 비밀 칸에도 저장 → 다른 기기·시크릿 창에서도 로그인만 하면 그대로
+  let synced = useSecretTmdb();
+  try { await setTmdbKey(key, true); } catch (e) { synced = false; }
+  tmdbKeyInput.value = '';
+  refreshTmdbToggle();
+  tmdbMsg.textContent = '✔ 연결됐어요! ' + (synced
+    ? '주인장 계정에 저장해 뒀으니 다른 기기에서도 로그인만 하면 돼요.'
+    : '(이 브라우저에만 저장했어요)');
+  setTimeout(() => { tmdbBox.hidden = true; }, 2200);
 });
+// 이 브라우저에만 있던 키는, 주인장으로 들어왔을 때 비밀 칸으로 자동으로 옮겨 둬요
+if (useSecretTmdb() && !CLOUD.getSecret(TMDB_KEY_NAME) && store.get(TMDB_KEY_NAME, '').trim()) {
+  CLOUD.setSecret(TMDB_KEY_NAME, store.get(TMDB_KEY_NAME, '').trim()).catch(() => {});
+}
 refreshTmdbToggle();
 
 /* =========================================================

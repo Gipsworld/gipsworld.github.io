@@ -69,6 +69,8 @@
   const sb = window.supabase.createClient(url, key);
   const cache = {};      // 이름표 → 내용(글자)
   const timers = {};     // 저장 대기 중인 이름표
+  const secrets = {};    // 주인장만 보는 비밀 칸 (TMDB 키 등)
+  let secretsOk = false; // 비밀 칸을 불러왔는지 (표가 아직 없으면 false)
   let owner = false;
   let failed = false;
 
@@ -182,6 +184,19 @@
       if (owner) flush(k);
     },
     usesRecords: (name) => RECORD_STORES.includes(name),
+    // 비밀 칸: 주인장으로 로그인했을 때만 쓸 수 있어요
+    secretsAvailable: () => owner && secretsOk,
+    getSecret: (k) => secrets[k] || '',
+    peekSecret(k, v) { secrets[k] = v; },          // 잠깐 바꿔 보기 (저장 안 함)
+    async setSecret(k, v) {
+      if (!owner || !secretsOk) throw new Error('주인장만 저장할 수 있어요');
+      secrets[k] = v;
+      const q = v
+        ? sb.from('owner_secrets').upsert({ key: k, value: v, updated_at: new Date().toISOString() })
+        : sb.from('owner_secrets').delete().eq('key', k);
+      const { error } = await q;
+      if (error) throw error;
+    },
     recordStore,
     guestbook,
     async hitVisit(first) {
@@ -294,6 +309,11 @@
       if (sess.data && sess.data.session) {
         const { data } = await sb.rpc('is_owner');
         owner = !!data;
+      }
+      if (owner) {
+        // 비밀 칸 불러오기 (supabase-setup.sql 9번을 아직 안 했으면 조용히 넘어가요)
+        const sec = await sb.from('owner_secrets').select('key,value');
+        if (!sec.error) { (sec.data || []).forEach(r => { secrets[r.key] = r.value; }); secretsOk = true; }
       }
     } catch (e) {
       failed = true;
