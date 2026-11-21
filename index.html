@@ -388,6 +388,13 @@
               <button type="button" class="write-btn" id="travelAddBtn">＋ 여행 기록</button>
             </div>
 
+            <div class="map-search-wrap">
+              <form class="map-search" id="mapSearch" role="search">
+                <input type="search" id="mapQuery" placeholder="🔍 장소 검색 (예: 에펠탑, 제주 협재해변)" aria-label="장소 검색" autocomplete="off">
+                <button type="submit" class="mini-btn primary">찾기</button>
+              </form>
+              <ul class="map-results" id="mapResults" hidden></ul>
+            </div>
             <div class="map-wrap">
               <div class="travel-map" id="travelMap"></div>
               <p class="map-msg" id="mapMsg" hidden>지도를 불러오지 못했어요. 인터넷 연결을 확인해 주세요. (기록은 그대로 쓸 수 있어요)</p>

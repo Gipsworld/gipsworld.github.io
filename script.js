@@ -2103,6 +2103,11 @@ function makeLeafletView() {
     },
     fit(pts) { map.fitBounds(pts.map(p => [p.lat, p.lng]), { padding: [30, 30], maxZoom: 10 }); },
     focus(t) { map.flyTo([t.lat, t.lng], 11); if (markers[t.id]) markers[t.id].openPopup(); },
+    // 검색한 곳으로 이동 (box: [남, 북, 서, 동] 범위가 있으면 그 범위가 다 보이게)
+    goTo(p) {
+      if (p.box) map.flyToBounds([[p.box[0], p.box[2]], [p.box[1], p.box[3]]], { maxZoom: 15 });
+      else map.flyTo([p.lat, p.lng], 14);
+    },
     resize() { map.invalidateSize(); }
   };
 }
@@ -2154,6 +2159,12 @@ function makeGoogleView() {
       gmap.setZoom(11);
       if (marks[t.id]) openInfo(marks[t.id], t);
     },
+    goTo(p) {
+      if (p.box) {
+        gmap.fitBounds({ south: p.box[0], north: p.box[1], west: p.box[2], east: p.box[3] });
+        g.event.addListenerOnce(gmap, 'idle', () => { if (gmap.getZoom() > 16) gmap.setZoom(16); });
+      } else { gmap.panTo({ lat: p.lat, lng: p.lng }); gmap.setZoom(14); }
+    },
     resize() {}   // 구글 지도는 크기 변화를 스스로 알아채요
   };
 }
@@ -2167,7 +2178,7 @@ function loadGoogleMaps(key) {
       window.__gipMapsReady = () => resolve();
       const s = document.createElement('script');
       s.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(key) +
-        '&v=weekly&loading=async&libraries=marker&language=ko&callback=__gipMapsReady';
+        '&v=weekly&loading=async&libraries=marker,places&language=ko&callback=__gipMapsReady';
       s.async = true;
       s.onerror = reject;
       document.head.appendChild(s);
@@ -2223,6 +2234,95 @@ function setPick(latlng) {
     : (mapView ? '📍 지도를 눌러 위치를 골라 주세요 (안 골라도 저장돼요)' : '');
   if (mapView) mapView.setPick(latlng);
 }
+
+/* ---------- 장소 검색 ----------
+   구글 지도일 때: 구글 장소 검색 (Places API)
+   기본 지도이거나 구글 검색이 막혔을 때: OpenStreetMap 공개 검색 (Nominatim) */
+const mapSearch = document.getElementById('mapSearch');
+const mapQuery = document.getElementById('mapQuery');
+const mapResults = document.getElementById('mapResults');
+
+async function searchGoogle(q) {
+  const { Place } = await google.maps.importLibrary('places');
+  const { places } = await Place.searchByText({
+    textQuery: q, fields: ['displayName', 'formattedAddress', 'location', 'viewport'], maxResultCount: 5, language: 'ko'
+  });
+  return (places || []).filter(p => p.location).map(p => {
+    const v = p.viewport;
+    return {
+      name: p.displayName || q, address: p.formattedAddress || '',
+      lat: p.location.lat(), lng: p.location.lng(),
+      box: v ? [v.getSouthWest().lat(), v.getNorthEast().lat(), v.getSouthWest().lng(), v.getNorthEast().lng()] : null
+    };
+  });
+}
+async function searchOSM(q) {
+  const res = await fetchWithTimeout('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&accept-language=ko&q=' + encodeURIComponent(q));
+  if (!res.ok) throw new Error('search ' + res.status);
+  return (await res.json()).map(r => ({
+    name: r.name || (r.display_name || '').split(',')[0], address: r.display_name || '',
+    lat: +r.lat, lng: +r.lon,
+    box: r.boundingbox ? r.boundingbox.map(Number) : null   // [남, 북, 서, 동]
+  }));
+}
+
+function showResults(list, message) {
+  mapResults.innerHTML = '';
+  if (message) {
+    const li = document.createElement('li');
+    li.className = 'map-results-msg';
+    li.textContent = message;
+    mapResults.appendChild(li);
+  }
+  list.forEach(p => {
+    const li = document.createElement('li');
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    const b = document.createElement('b'); b.textContent = p.name;
+    const s = document.createElement('span'); s.textContent = p.address;
+    btn.append(b, s);
+    btn.addEventListener('click', () => choosePlace(p));
+    li.appendChild(btn);
+    mapResults.appendChild(li);
+  });
+  mapResults.hidden = false;
+}
+function hideResults() { mapResults.hidden = true; }
+
+// 결과를 고르면: 지도 이동 + (주인장이면) 그 자리에 핀을 꽂고 쓰기 칸 열기
+function choosePlace(p) {
+  hideResults();
+  if (!mapView) return;
+  mapView.goTo(p);
+  if (!canEdit()) return;
+  if (travelForm.hidden) openTravelForm(null);
+  if (!tPlace.value.trim()) tPlace.value = p.name.slice(0, 40);
+  setPick({ lat: p.lat, lng: p.lng });
+}
+
+mapSearch.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const q = mapQuery.value.trim();
+  if (!q) return;
+  if (!mapView) initMap();
+  const btn = mapSearch.querySelector('button');
+  btn.disabled = true;
+  showResults([], '🔎 찾는 중…');
+  let list = null;
+  try {
+    if (mapView && mapView.kind === 'google') {
+      try { list = await searchGoogle(q); }
+      catch (err) { console.warn('구글 장소 검색이 막혀서 공개 검색으로 찾아요', err); }
+    }
+    if (!list) list = await searchOSM(q);
+    showResults(list, list.length ? '' : '검색 결과가 없어요. 다른 이름으로 찾아보세요.');
+  } catch (err) {
+    showResults([], '지금은 검색할 수 없어요. 인터넷 연결을 확인해 주세요.');
+  } finally { btn.disabled = false; }
+});
+// 결과 목록 바깥을 누르거나 Esc를 누르면 닫혀요
+document.addEventListener('click', (e) => { if (!mapResults.hidden && !e.target.closest('.map-search-wrap')) hideResults(); });
+mapQuery.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideResults(); });
 
 function popupNode(t) {
   const box = document.createElement('div');
