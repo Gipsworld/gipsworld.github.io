@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gip's HP</title>
+
+  <!-- 글꼴 불러오기: DotGothic16(픽셀 영문), Gowun Dodum(따뜻한 한글) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Gowun+Dodum&display=swap" rel="stylesheet">
+
+  <!-- 지도 도구 Leaflet의 디자인 (TRAVEL 메뉴에서 사용) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+
+  <!-- 디자인 파일 연결 -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="page">
+
+    <!-- ========== 상단: 방문자 수 / 제목 / 배경음악 ========== -->
+    <header class="topbar">
+      <div class="counter" aria-label="방문자 수">
+        <span>TODAY <b id="todayCount" class="today-num">0</b></span>
+        <span class="bar">|</span>
+        <span>TOTAL <b id="totalCount" class="total-num">0</b></span>
+      </div>
+
+      <div class="title-wrap">
+        <h1 class="site-title">
+          <svg class="px-heart" viewBox="0 0 7 6" aria-hidden="true">
+            <path d="M1 0h2v1h1V0h2v1h1v2H6v1H5v1H4v1H3V5H2V4H1V3H0V1h1z" />
+          </svg>
+          Gip's HP
+        </h1>
+        <p class="since">since <span id="openDate">2026.11.21</span> · D+<span id="dday">1</span></p>
+      </div>
+
+      <!-- 배경음악 플레이어 -->
+      <section class="bgm" id="bgm" aria-label="배경음악 플레이어">
+        <div class="bgm-top">
+          <span class="bgm-label">♪ BGM</span>
+          <div class="marquee"><span id="trackTitle">01. 오후 세 시의 햇살</span></div>
+        </div>
+        <div class="progress"><div class="progress-fill" id="progressFill"></div></div>
+        <div class="bgm-controls">
+          <button class="ctrl" id="prevBtn" aria-label="이전 곡">◀◀</button>
+          <button class="ctrl play" id="playBtn" aria-label="재생">▶</button>
+          <button class="ctrl" id="nextBtn" aria-label="다음 곡">▶▶</button>
+          <div class="eq" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+          <span class="time" id="time">00:00</span>
+          <input type="range" id="volume" min="0" max="100" value="60" aria-label="음량">
+        </div>
+        <div class="bgm-list">
+          <select id="trackSelect" aria-label="곡 고르기"></select>
+          <button type="button" class="ctrl wide" id="musicAddBtn" title="내 컴퓨터의 음악 파일(mp3 등)을 넣어요">＋ 내 음악</button>
+          <button type="button" class="ctrl" id="musicDelBtn" aria-label="이 곡 목록에서 빼기" title="이 곡 목록에서 빼기" hidden>✕</button>
+          <input type="file" id="musicInput" accept="audio/*" multiple hidden>
+        </div>
+      </section>
+    </header>
+
+    <!-- ========== 미니홈피 본체 ========== -->
+    <div class="book">
+      <div class="book-inner">
+
+        <!-- ----- 왼쪽: 프로필 ----- -->
+        <aside class="card profile">
+          <div class="mood">
+            <span class="mini-label">TODAY IS..</span>
+            <div class="mood-picker">
+              <button class="mood-arrow" id="moodPrev" aria-label="이전 기분">◀</button>
+              <span class="mood-value" id="moodValue">😊 행복</span>
+              <button class="mood-arrow" id="moodNext" aria-label="다음 기분">▶</button>
+            </div>
+          </div>
+
+          <!-- 프로필 사진: 폴더에 profile.jpg 파일을 넣으면 자동으로 바뀌어요 -->
+          <figure class="polaroid">
+            <div class="photo">
+              <div class="avatar" id="avatar" aria-hidden="true"></div>
+              <img src="profile.jpg" alt="Gip의 프로필 사진" onerror="this.remove()">
+            </div>
+            <figcaption>Gip ✿</figcaption>
+          </figure>
+
+          <div class="word">
+            <div class="word-head">
+              <span class="mini-label">오늘의 한마디</span>
+              <button class="edit-btn" id="editWord" aria-label="한마디 수정">✎</button>
+            </div>
+            <p class="word-text" id="wordText">천천히, 그래도 꾸준히 🌱</p>
+          </div>
+
+          <div class="intro">
+            <h2 class="name">GIP <small>깊</small></h2>
+            <p>좋아하는 것들을 차곡차곡 모아두는 작은 방</p>
+          </div>
+
+          <dl class="info">
+            <div><dt>🌞</dt><dd>어딘가 햇살 좋은 곳</dd></div>
+            <div><dt>💌</dt><dd>놀러 와 줘서 고마워요</dd></div>
+          </dl>
+        </aside>
+
+        <!-- ----- 오른쪽: 메인 내용 ----- -->
+        <main class="card content">
+
+          <!-- HOME 화면 -->
+          <div id="homePanel">
+            <section class="news-wrap">
+              <div class="news">
+                <h3 class="section-title">Updated news</h3>
+                <ul class="news-list">
+                  <li data-go="diary" class="clickable"><span class="tag t-diary">DIARY</span><span class="news-title" id="newsDiaryTitle">미니홈피 문을 열었어요!</span><span class="news-date" id="newsDiaryDate">11.21</span></li>
+                  <li data-go="movie" class="clickable"><span class="tag t-movie">MOVIE</span><span class="news-title" id="newsMovieTitle">아직 기록이 없어요</span><span class="news-date" id="newsMovieDate"></span></li>
+                  <li data-go="book" class="clickable"><span class="tag t-book">BOOK</span><span class="news-title" id="newsBookTitle">아직 꽂힌 책이 없어요</span><span class="news-date" id="newsBookDate"></span></li>
+                  <li data-go="travel" class="clickable"><span class="tag t-travel">TRAVEL</span><span class="news-title" id="newsTravelTitle">아직 여행 기록이 없어요</span><span class="news-date" id="newsTravelDate"></span></li>
+                  <li data-go="photo" class="clickable"><span class="tag t-photo">PHOTO</span><span class="news-title" id="newsPhotoTitle">아직 사진이 없어요</span><span class="news-date" id="newsPhotoDate"></span></li>                </ul>
+              </div>
+
+              <div class="board-count">
+                <h3 class="section-title">My room</h3>
+                <ul>
+                  <li data-go="diary"><span>DIARY</span><b id="diaryCount">1</b><i class="new" id="diaryNew">N</i></li>
+                  <li data-go="movie"><span>MOVIE</span><b id="movieCount">0</b><i class="new" id="movieNew" hidden>N</i></li>
+                  <li data-go="book"><span>BOOK</span><b id="bookCount">0</b><i class="new" id="bookNew" hidden>N</i></li>
+                  <li data-go="travel"><span>TRAVEL</span><b id="travelCount">0</b><i class="new" id="travelNew" hidden>N</i></li>
+                  <li data-go="photo"><span>PHOTO</span><b id="photoCount">0</b><i class="new" id="photoNew" hidden>N</i></li>
+                  <li data-go="guest"><span>GUEST</span><b id="guestCount">0</b><i class="new" id="guestNew" hidden>N</i></li>
+                </ul>
+              </div>
+            </section>
+
+            <section class="room-wrap">
+              <h3 class="section-title">Mini room</h3>
+              <div class="room" id="room" aria-label="픽셀 아트로 그린 작은 방"></div>
+              <p class="room-caption" id="roomCaption">창밖엔 구름, 방 안엔 잠든 고양이 한 마리 🐈</p>
+            </section>
+
+            <!-- 도란도란 (한 줄 남기기) -->
+            <section class="ilchon">
+              <h3 class="section-title">도란도란</h3>
+              <form class="ilchon-form" id="ilchonForm">
+                <input type="text" id="iName" placeholder="이름" maxlength="10" required aria-label="이름">
+                <input type="text" id="iText" placeholder="발도장 꾹, 한 줄 남겨 주세요 🐾" maxlength="45" required aria-label="한 줄 남기기">
+                <button type="submit" class="mini-btn primary">등록</button>
+              </form>
+              <ul class="ilchon-list" id="ilchonList"></ul>
+              <button type="button" class="ilchon-more" id="ilchonMore" hidden>더 보기 ▾</button>
+            </section>
+          </div>
+
+          <!-- DIARY 화면 -->
+          <div id="diaryPanel" class="diary-panel" hidden>
+            <div class="diary-head">
+              <h3 class="section-title">DIARY</h3>
+              <button type="button" class="write-btn" id="writeBtn">✎ 일기 쓰기</button>
+            </div>
+
+            <div class="diary-layout">
+              <!-- 달력 -->
+              <div class="calendar">
+                <div class="cal-head">
+                  <button type="button" class="cal-nav" id="calPrev" aria-label="이전 달">◀</button>
+                  <span id="calTitle">2026.11</span>
+                  <button type="button" class="cal-nav" id="calNext" aria-label="다음 달">▶</button>
+                </div>
+                <div class="cal-week"><span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span></div>
+                <div class="cal-grid" id="calGrid"></div>
+                <button type="button" class="cal-all" id="calAll">전체 일기 보기</button>
+              </div>
+
+              <div class="diary-main">
+                <!-- 일기 쓰기 칸 (버튼을 누르면 나타나요) -->
+                <form class="diary-form" id="diaryForm" hidden>
+                  <p class="form-title" id="formTitle">새 일기</p>
+                  <div class="form-row">
+                    <label>날짜 <input type="date" id="fDate" required></label>
+                    <label>기분 <select id="fMood"></select></label>
+                  </div>
+                  <input type="text" id="fTitle" placeholder="제목을 적어 주세요" maxlength="40" required>
+                  <textarea id="fBody" rows="6" placeholder="오늘은 어떤 하루였나요?" required></textarea>
+                  <div class="form-btns">
+                    <button type="button" class="mini-btn" id="cancelBtn">취소</button>
+                    <button type="submit" class="mini-btn primary">저장하기</button>
+                  </div>
+                </form>
+
+                <p class="diary-filter" id="diaryFilter" hidden></p>
+                <ul class="diary-list" id="diaryList"></ul>
+                <nav class="pager" id="diaryPager" aria-label="일기 페이지"></nav>
+              </div>
+            </div>
+          </div>
+
+          <!-- MOVIE 화면 -->
+          <div id="moviePanel" class="movie-panel" hidden>
+            <div class="diary-head">
+              <h3 class="section-title">MOVIE</h3>
+              <button type="button" class="write-btn" id="movieAddBtn">＋ 영화 기록</button>
+            </div>
+
+            <div class="movie-bar">
+              <p class="movie-summary" id="movieSummary"></p>
+              <div class="sort-btns">
+                <button type="button" class="sort-btn active" data-sort="date">최신순</button>
+                <button type="button" class="sort-btn" data-sort="star">별점순</button>
+                <button type="button" class="mini-btn tmdb-toggle" id="tmdbToggle">⚙ TMDB 연결하기</button>
+              </div>
+            </div>
+
+            <!-- TMDB 연결 상자 (⚙ 버튼을 누르면 열려요) -->
+            <div class="diary-form tmdb-box" id="tmdbBox" hidden>
+              <p class="form-title">TMDB 연결</p>
+              <p class="tmdb-guide">
+                ① <a href="https://www.themoviedb.org/signup" target="_blank" rel="noopener noreferrer">TMDB 회원가입</a>
+                → ② <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener noreferrer">설정 › API</a>에서 키 신청
+                → ③ <b>API 키</b> 또는 <b>API 읽기 액세스 토큰</b>을 복사해 아래에 붙여 넣어요.
+              </p>
+              <div class="link-row">
+                <input type="password" id="tmdbKeyInput" placeholder="🔑 API 키 붙여 넣기" autocomplete="off" spellcheck="false">
+                <button type="button" class="mini-btn primary" id="tmdbSaveBtn">연결하기</button>
+              </div>
+              <p class="poster-hint" id="tmdbMsg"></p>
+              <div class="form-btns">
+                <button type="button" class="mini-btn" id="tmdbRemoveBtn">연결 끊기</button>
+                <button type="button" class="mini-btn" id="tmdbCloseBtn">닫기</button>
+              </div>
+            </div>
+
+            <form class="diary-form" id="movieForm" hidden>
+              <p class="form-title" id="movieFormTitle">새 영화 기록</p>
+              <div class="link-row">
+                <input type="text" id="mTitle" placeholder="영화 제목" maxlength="40" required>
+                <button type="button" class="mini-btn primary" id="mAutoBtn" title="위키데이터에서 감독·배우·장르를 찾아 채워요">✨ 정보 자동 채우기</button>
+              </div>
+              <p class="poster-hint" id="autoHint" hidden></p>
+              <div class="candidates" id="tmdbCandidates" hidden></div>
+              <div class="link-row">
+                <input type="text" id="mLink" inputmode="url" placeholder="🔗 영화 정보 링크 (선택) — 주소를 복사해 붙여 넣어요" maxlength="500">
+                <button type="button" class="mini-btn" id="mSearchBtn" title="영화 제목으로 네이버 검색을 새 탭에 열어요">네이버 검색</button>
+              </div>
+              <div class="poster-row">
+                <div class="poster-preview" id="posterPreview" title="포스터 이미지를 여기로 끌어다 놓아도 돼요">🎞</div>
+                <div class="poster-tools">
+                  <div class="poster-btns">
+                    <button type="button" class="mini-btn" id="posterFetchBtn">✨ 링크에서 포스터 불러오기</button>
+                    <button type="button" class="mini-btn" id="posterFileBtn">📁 파일 올리기</button>
+                    <button type="button" class="mini-btn" id="posterClearBtn" hidden>✕ 지우기</button>
+                  </div>
+                  <p class="poster-hint" id="posterHint"></p>
+                  <input type="file" id="posterInput" accept="image/*" hidden>
+                </div>
+              </div>
+              <div class="form-grid">
+                <input type="text" id="mDirector" placeholder="🎬 감독" maxlength="40">
+                <input type="text" id="mActors" placeholder="👥 배우 (쉼표로 구분: 송강호, 김혜수)" maxlength="120">
+              </div>
+              <div class="form-row">
+                <label>본 날짜 <input type="date" id="mDate" required></label>
+              </div>
+              <div class="genre-pick">
+                <p class="genre-pick-label">장르 <small id="genreHint">최대 3개 · 처음 고른 장르 색이 티켓 색이 돼요</small></p>
+                <div class="genre-chips" id="mGenres" role="group" aria-label="장르 고르기"></div>
+              </div>
+              <input type="text" id="mPlace" placeholder="📍 본 장소 (예: CGV 용산, 우리 집 소파)" maxlength="40">
+              <div class="form-row star-row">
+                <span>별점</span>
+                <div class="star-pick" id="starPick" aria-label="별점 고르기 (별의 왼쪽 반 = 0.5점)"></div>
+                <span class="star-value" id="starValue">4.0</span>
+              </div>
+              <input type="text" id="mReview" placeholder="한줄평 (예: 엔딩 크레딧까지 자리를 뜰 수 없었다)" maxlength="60">
+              <div class="essay-wrap">
+                <textarea id="mEssay" class="essay-input" rows="8" data-count placeholder="📝 감상문 (선택) — 인상 깊은 장면, 연출과 연기, 영화가 남긴 생각을 자유롭게 적어 보세요"></textarea>
+                <span class="char-count"></span>
+              </div>
+              <div class="form-btns">
+                <button type="button" class="mini-btn" id="movieCancelBtn">취소</button>
+                <button type="submit" class="mini-btn primary">저장하기</button>
+              </div>
+            </form>
+
+            <ul class="ticket-list" id="movieList"></ul>
+            <p class="tmdb-credit">영화 정보·포스터 제공: TMDB, 위키데이터 · This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
+          </div>
+
+          <!-- PHOTO 화면 -->
+          <div id="photoPanel" class="photo-panel" hidden>
+            <div class="diary-head">
+              <h3 class="section-title">PHOTO</h3>
+              <button type="button" class="write-btn" id="photoAddBtn">＋ 사진 올리기</button>
+              <input type="file" id="photoInput" accept="image/*" multiple hidden>
+            </div>
+            <p class="photo-status" id="photoStatus" hidden></p>
+
+            <!-- 앨범(폴더) 칸 -->
+            <ul class="album-shelf" id="albumShelf" aria-label="앨범 목록"></ul>
+
+            <!-- 지금 보고 있는 앨범 + 도구 -->
+            <div class="album-bar">
+              <p class="album-now" id="albumNow"></p>
+              <div class="album-tools">
+                <button type="button" class="mini-btn" id="albumRenameBtn">✎ 이름 바꾸기</button>
+                <button type="button" class="mini-btn" id="albumDeleteBtn">앨범 지우기</button>
+                <button type="button" class="mini-btn" id="selectModeBtn">☑ 여러 장 고르기</button>
+              </div>
+            </div>
+
+            <!-- 여러 장 고르기 막대 -->
+            <div class="select-bar" id="selectBar" hidden>
+              <span class="select-count" id="selectCount">0장 골랐어요</span>
+              <label class="move-label">→ <select id="moveTarget" aria-label="옮길 앨범"></select></label>
+              <button type="button" class="mini-btn primary" id="moveBtn">옮기기</button>
+              <button type="button" class="mini-btn" id="selectAllBtn">모두 고르기</button>
+              <button type="button" class="mini-btn" id="selectDeleteBtn">지우기</button>
+              <button type="button" class="mini-btn" id="selectCancelBtn">끝내기</button>
+            </div>
+
+            <ul class="photo-grid" id="photoGrid"></ul>
+          </div>
+
+          <!-- BOOK 화면 -->
+          <div id="bookPanel" class="shelf-panel" hidden>
+            <div class="diary-head">
+              <h3 class="section-title">BOOK</h3>
+              <button type="button" class="write-btn" id="bookAddBtn">＋ 책 꽂기</button>
+            </div>
+
+            <div class="movie-bar">
+              <p class="movie-summary" id="bookSummary"></p>
+              <div class="sort-btns">
+                <button type="button" class="sort-btn active" data-filter="all">전체</button>
+                <button type="button" class="sort-btn" data-filter="reading">읽는 중</button>
+                <button type="button" class="sort-btn" data-filter="done">다 읽음</button>
+                <button type="button" class="sort-btn" data-filter="wish">읽고 싶음</button>
+              </div>
+            </div>
+
+            <form class="diary-form" id="bookForm" hidden>
+              <p class="form-title" id="bookFormTitle">새 책</p>
+              <input type="text" id="bTitle" placeholder="책 제목" maxlength="40" required>
+              <input type="text" id="bAuthor" placeholder="지은이" maxlength="30">
+              <input type="text" id="bLink" inputmode="url" placeholder="🔗 책 링크 (선택) — 서점의 책 페이지 주소를 붙여 넣어요" maxlength="500">
+              <div class="store-search">
+                <span>서점에서 찾기</span>
+                <button type="button" class="mini-btn" data-store="aladin" title="책 제목으로 알라딘 검색을 새 탭에 열어요">알라딘</button>
+                <button type="button" class="mini-btn" data-store="yes24" title="책 제목으로 예스24 검색을 새 탭에 열어요">예스24</button>
+                <button type="button" class="mini-btn" data-store="kyobo" title="책 제목으로 교보문고 검색을 새 탭에 열어요">교보문고</button>
+              </div>
+              <div class="poster-row">
+                <div class="poster-preview" id="coverPreview" title="표지 이미지를 여기로 끌어다 놓아도 돼요">📕</div>
+                <div class="poster-tools">
+                  <div class="poster-btns">
+                    <button type="button" class="mini-btn" id="coverFetchBtn">✨ 표지 불러오기</button>
+                    <button type="button" class="mini-btn" id="coverFileBtn">📁 파일 올리기</button>
+                    <button type="button" class="mini-btn" id="coverClearBtn" hidden>✕ 지우기</button>
+                  </div>
+                  <p class="poster-hint" id="coverHint"></p>
+                  <input type="file" id="coverInput" accept="image/*" hidden>
+                </div>
+              </div>
+              <div class="form-row">
+                <label>상태 <select id="bStatus"></select></label>
+                <label>날짜 <input type="date" id="bDate"></label>
+              </div>
+              <textarea id="bQuote" rows="2" placeholder="밑줄 그은 한 문장"></textarea>
+              <textarea id="bMemo" rows="3" placeholder="읽고 난 생각, 짧은 메모"></textarea>
+              <div class="essay-wrap">
+                <textarea id="bEssay" class="essay-input" rows="8" data-count placeholder="📝 감상문 (선택) — 책이 건넨 질문, 오래 남은 장면, 나에게 일어난 변화를 길게 적어 보세요"></textarea>
+                <span class="char-count"></span>
+              </div>
+              <div class="form-btns">
+                <button type="button" class="mini-btn" id="bookCancelBtn">취소</button>
+                <button type="submit" class="mini-btn primary">저장하기</button>
+              </div>
+            </form>
+
+            <div class="shelf" id="shelf"></div>
+            <div class="bk-detail" id="bookDetail"></div>
+          </div>
+
+          <!-- TRAVEL 화면 -->
+          <div id="travelPanel" class="travel-panel" hidden>
+            <div class="diary-head">
+              <h3 class="section-title">TRAVEL</h3>
+              <button type="button" class="write-btn" id="travelAddBtn">＋ 여행 기록</button>
+            </div>
+
+            <div class="map-wrap">
+              <div class="travel-map" id="travelMap"></div>
+              <p class="map-msg" id="mapMsg" hidden>지도를 불러오지 못했어요. 인터넷 연결을 확인해 주세요. (기록은 그대로 쓸 수 있어요)</p>
+            </div>
+            <p class="map-tip"><span class="map-tip-pin">지도를 누르면 그 자리에 핀을 꽂을 수 있어요 · </span><span class="dot pink"></span>다녀온 곳 <span class="dot blue"></span>가고 싶은 곳</p>
+
+            <form class="diary-form" id="travelForm" hidden>
+              <p class="form-title" id="travelFormTitle">새 여행 기록</p>
+              <p class="pick-hint" id="pickHint"></p>
+              <input type="text" id="tPlace" placeholder="장소 이름 (예: 제주 협재해변)" maxlength="40" required>
+              <div class="form-row">
+                <label>구분
+                  <select id="tStatus">
+                    <option value="visited">다녀온 곳</option>
+                    <option value="wish">가고 싶은 곳</option>
+                  </select>
+                </label>
+              </div>
+              <div class="form-row" id="tDates">
+                <label>떠난 날 <input type="date" id="tStart"></label>
+                <label>돌아온 날 <input type="date" id="tEnd"></label>
+              </div>
+              <textarea id="tMemo" rows="3" placeholder="기억하고 싶은 풍경, 음식, 사람"></textarea>
+              <div class="trip-photo-pick" id="tPhotoPick">
+                <div class="trip-photo-head">
+                  <span>📷 여행 사진 <small id="tPhotoCount"></small></span>
+                  <button type="button" class="mini-btn" id="tPhotoBtn">＋ 사진 넣기</button>
+                </div>
+                <ul class="trip-thumbs" id="tPhotoList"></ul>
+                <p class="poster-hint" id="tPhotoHint"></p>
+                <input type="file" id="tPhotoInput" accept="image/*" multiple hidden>
+              </div>
+              <div class="form-btns">
+                <button type="button" class="mini-btn" id="travelCancelBtn">취소</button>
+                <button type="submit" class="mini-btn primary">저장하기</button>
+              </div>
+            </form>
+
+            <div class="movie-bar">
+              <p class="movie-summary" id="travelSummary"></p>
+              <div class="sort-btns">
+                <button type="button" class="sort-btn active" data-filter="all">전체</button>
+                <button type="button" class="sort-btn" data-filter="visited">다녀온 곳</button>
+                <button type="button" class="sort-btn" data-filter="wish">가고 싶은 곳</button>
+              </div>
+            </div>
+            <ul class="trip-list" id="tripList"></ul>
+          </div>
+
+          <!-- GUEST 화면 (방명록) -->
+          <div id="guestPanel" class="guest-panel" hidden>
+            <div class="diary-head">
+              <h3 class="section-title">GUEST BOOK</h3>
+            </div>
+            <p class="guest-note">💌 놀러 와 줘서 고마워요! 작은 발자국을 남겨 주세요.</p>
+            <form class="guest-form" id="guestForm">
+              <div class="guest-form-top">
+                <div class="minimi-pick" id="minimiPick" role="radiogroup" aria-label="미니미 고르기"></div>
+                <input type="text" id="gName" placeholder="이름" maxlength="12" required aria-label="이름">
+              </div>
+              <textarea id="gText" rows="3" maxlength="300" placeholder="따뜻한 한마디를 남겨 주세요 (300자까지)" required aria-label="방명록 내용"></textarea>
+              <div class="form-btns">
+                <button type="submit" class="mini-btn primary">남기기</button>
+              </div>
+            </form>
+            <ul class="guest-list" id="guestList"></ul>
+            <nav class="pager" id="guestPager" aria-label="방명록 페이지"></nav>
+          </div>
+        </main>
+      </div>
+
+      <!-- ----- 메뉴 탭 ----- -->
+      <nav class="tabs" aria-label="메뉴">
+        <button class="tab active" data-go="home">HOME</button>
+        <button class="tab" data-go="diary">DIARY</button>
+        <button class="tab" data-go="movie">MOVIE</button>
+        <button class="tab" data-go="book">BOOK</button>
+        <button class="tab" data-go="travel">TRAVEL</button>
+        <button class="tab" data-go="photo">PHOTO</button>
+        <button class="tab" data-go="guest">GUEST</button>
+      </nav>
+    </div>
+
+    <footer class="footer">
+      © 2026 Gip's HP · made with ♥ and pixels
+      <span class="owner-tools">
+        <button type="button" class="owner-link" id="ownerBtn" hidden>주인장</button>
+        <button type="button" class="owner-link" id="migrateBtn" hidden>☁ 내 기록 이사하기</button>
+      </span>
+    </footer>
+  </div>
+
+  <!-- 사진 크게 보기 창 -->
+  <div class="lightbox" id="lightbox" hidden>
+    <div class="lb-box" role="dialog" aria-modal="true" aria-label="사진 크게 보기">
+      <button type="button" class="lb-close" id="lbClose" aria-label="닫기">✕</button>
+      <div class="lb-photo">
+        <button type="button" class="lb-nav" id="lbPrev" aria-label="이전 사진">◀</button>
+        <img id="lbImg" alt="">
+        <button type="button" class="lb-nav" id="lbNext" aria-label="다음 사진">▶</button>
+      </div>
+      <div class="lb-info">
+        <input type="text" id="lbCaption" placeholder="사진에 한마디를 남겨 보세요" maxlength="40" aria-label="사진 한마디">
+        <input type="date" id="lbDate" aria-label="사진 날짜">
+        <select id="lbAlbum" aria-label="이 사진의 앨범"></select>
+        <button type="button" class="mini-btn" id="lbDelete">삭제</button>
+      </div>
+      <p class="lb-count" id="lbCount"></p>
+    </div>
+  </div>
+
+  <!-- 감상문 읽기 창 -->
+  <div class="lightbox" id="reader" hidden>
+    <article class="lb-box reader-box" role="dialog" aria-modal="true" aria-labelledby="readerTitle">
+      <button type="button" class="lb-close" id="readerClose" aria-label="닫기">✕</button>
+      <p class="reader-kind" id="readerKind">REVIEW</p>
+      <h3 class="reader-title" id="readerTitle"></h3>
+      <p class="reader-sub" id="readerSub"></p>
+      <div class="reader-text" id="readerText"></div>
+    </article>
+  </div>
+
+  <!-- 여행 사진 크게 보기 창 -->
+  <div class="lightbox" id="tripViewer" hidden>
+    <div class="lb-box" role="dialog" aria-modal="true" aria-labelledby="tvTitle">
+      <button type="button" class="lb-close" id="tvClose" aria-label="닫기">✕</button>
+      <p class="tv-title" id="tvTitle"></p>
+      <div class="lb-photo">
+        <button type="button" class="lb-nav" id="tvPrev" aria-label="이전 사진">◀</button>
+        <img id="tvImg" alt="">
+        <button type="button" class="lb-nav" id="tvNext" aria-label="다음 사진">▶</button>
+      </div>
+      <ul class="tv-strip" id="tvStrip"></ul>
+      <p class="lb-count" id="tvCount"></p>
+    </div>
+  </div>
+
+  <!-- 지도 도구 Leaflet (TRAVEL 메뉴에서 사용) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+
+  <!-- 주인장 로그인 창 -->
+  <div class="lightbox" id="loginBox" hidden>
+    <form class="lb-box login-box" id="loginForm" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+      <button type="button" class="lb-close" id="loginClose" aria-label="닫기">✕</button>
+      <p class="reader-kind">OWNER</p>
+      <h3 class="reader-title" id="loginTitle">주인장 로그인</h3>
+      <input type="email" id="loginEmail" placeholder="이메일" autocomplete="username" required aria-label="이메일">
+      <input type="password" id="loginPw" placeholder="비밀번호" autocomplete="current-password" required aria-label="비밀번호">
+      <p class="login-msg" id="loginMsg" role="alert"></p>
+      <div class="form-btns">
+        <button type="submit" class="mini-btn primary">로그인</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- 동작 파일 연결: 연결 정보(config.js) → 온라인 저장소(cloud.js) → cloud.js가 script.js를 실행해요 -->
+  <script src="config.js"></script>
+  <script src="cloud.js"></script>
+</body>
+</html>
