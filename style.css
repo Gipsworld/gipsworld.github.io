@@ -1281,6 +1281,9 @@ button:focus-visible, input:focus-visible { outline: 2px dashed var(--blue-deep)
 .dot.blue { background: var(--blue-deep); }
 .pick-hint { font-size: 13px; color: var(--blue-deep); }
 
+/* 구글 지도 말풍선 안의 글자도 홈페이지 글꼴로 */
+.gm-style .trip-pop { font-family: var(--body); color: var(--ink); }
+.gm-style .trip-pop p { margin: 4px 0 0; font-size: 13px; max-width: 220px; }
 .px-pin { background: none; border: none; }
 .px-pin svg { display: block; width: 21px; height: 24px; filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, 0.25)); }
 

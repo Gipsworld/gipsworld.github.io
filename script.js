@@ -2062,33 +2062,166 @@ function tripDates(t) {
   return dot(t.start);
 }
 
-function initMap() {
-  if (map) return;
-  if (!window.L) { document.getElementById('mapMsg').hidden = false; return; }
+/* ---------- 지도 바꿔 끼우기 ----------
+   config.js에 구글 지도 키가 있으면 구글 지도, 없거나 못 불러오면 Leaflet(OpenStreetMap)을 써요.
+   두 지도 모두 같은 이름의 동작을 가지고 있어요:
+   setMarkers(여행들) · setPick(위치) · fit(위치들) · focus(여행) · resize() */
+let mapView = null;        // 지금 쓰는 지도
+let mapLoading = false;    // 구글 지도를 불러오는 중인지
+const mapEl = document.getElementById('travelMap');
+const MAP_START = { lat: 36.3, lng: 127.8 };   // 처음 보이는 곳 (한국)
+
+// 지도를 누르면 그 자리를 여행 위치로 골라요
+function onMapClick(latlng) {
+  if (!canEdit()) return;   // 방문자는 지도를 구경만 해요
+  if (travelForm.hidden) openTravelForm(null);
+  setPick(latlng);
+}
+
+function makeLeafletView() {
   // 마우스 휠로 확대/축소 (한 칸에 너무 많이 움직이지 않게 조금 부드럽게)
-  map = L.map('travelMap', { scrollWheelZoom: true, wheelPxPerZoomLevel: 90, zoomSnap: 0.5 }).setView([36.3, 127.8], 6);
+  map = L.map(mapEl, { scrollWheelZoom: true, wheelPxPerZoomLevel: 90, zoomSnap: 0.5 }).setView([MAP_START.lat, MAP_START.lng], 6);
   // 지도 그림: OpenStreetMap (예전에 쓰던 CARTO는 이제 키가 있어야 해서 바꿨어요)
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     maxZoom: 19,
     className: 'soft-tiles'
   }).addTo(map);
-  // 지도를 누르면 그 자리를 여행 위치로 골라요
-  map.on('click', (e) => {
-    if (!canEdit()) return;   // 방문자는 지도를 구경만 해요
-    if (travelForm.hidden) openTravelForm(null);
-    setPick({ lat: e.latlng.lat, lng: e.latlng.lng });
+  map.on('click', (e) => onMapClick({ lat: e.latlng.lat, lng: e.latlng.lng }));
+  return {
+    kind: 'leaflet',
+    setMarkers(list) {
+      Object.values(markers).forEach(m => m.remove());
+      markers = {};
+      list.forEach(t => {
+        markers[t.id] = L.marker([t.lat, t.lng], { icon: pinIcon(PIN_COLORS[t.status]) }).bindPopup(popupNode(t)).addTo(map);
+      });
+    },
+    setPick(ll) {
+      if (tempMarker) { tempMarker.remove(); tempMarker = null; }
+      if (ll) tempMarker = L.marker(ll, { icon: pinIcon(PIN_COLORS.pick), zIndexOffset: 1000 }).addTo(map);
+    },
+    fit(pts) { map.fitBounds(pts.map(p => [p.lat, p.lng]), { padding: [30, 30], maxZoom: 10 }); },
+    focus(t) { map.flyTo([t.lat, t.lng], 11); if (markers[t.id]) markers[t.id].openPopup(); },
+    resize() { map.invalidateSize(); }
+  };
+}
+
+function makeGoogleView() {
+  const g = google.maps;
+  const cfg = window.GIP_CONFIG || {};
+  const gmap = new g.Map(mapEl, {
+    center: MAP_START, zoom: 6,
+    mapId: (cfg.googleMapId || '').trim() || 'DEMO_MAP_ID',
+    gestureHandling: 'greedy',      // 마우스 휠로 바로 확대/축소
+    clickableIcons: false,          // 가게·명소 아이콘을 눌러도 구글 안내창이 뜨지 않게 (핀 꽂기 우선)
+    streetViewControl: false, mapTypeControl: false
   });
+  const info = new g.InfoWindow();
+  const pinEl = (color) => {
+    const d = document.createElement('div');
+    d.className = 'px-pin';
+    d.innerHTML = pixelSVG(PIN_MAP, { p: color, w: '#fffdf6' });
+    return d;
+  };
+  const openInfo = (m, t) => { info.setContent(popupNode(t)); info.open({ anchor: m, map: gmap }); };
+  let marks = {}, temp = null;
+  gmap.addListener('click', (e) => { if (e.latLng) onMapClick({ lat: e.latLng.lat(), lng: e.latLng.lng() }); });
+  return {
+    kind: 'google',
+    setMarkers(list) {
+      Object.values(marks).forEach(m => { m.map = null; });
+      marks = {};
+      list.forEach(t => {
+        const m = new g.marker.AdvancedMarkerElement({ map: gmap, position: { lat: t.lat, lng: t.lng }, content: pinEl(PIN_COLORS[t.status]), title: t.place });
+        m.addListener('click', () => openInfo(m, t));
+        marks[t.id] = m;
+      });
+    },
+    setPick(ll) {
+      if (temp) { temp.map = null; temp = null; }
+      if (ll) temp = new g.marker.AdvancedMarkerElement({ map: gmap, position: ll, content: pinEl(PIN_COLORS.pick), zIndex: 1000 });
+    },
+    fit(pts) {
+      if (pts.length === 1) { gmap.setCenter(pts[0]); gmap.setZoom(10); return; }
+      const b = new g.LatLngBounds();
+      pts.forEach(p => b.extend(p));
+      gmap.fitBounds(b, 40);
+      g.event.addListenerOnce(gmap, 'idle', () => { if (gmap.getZoom() > 10) gmap.setZoom(10); });
+    },
+    focus(t) {
+      gmap.panTo({ lat: t.lat, lng: t.lng });
+      gmap.setZoom(11);
+      if (marks[t.id]) openInfo(marks[t.id], t);
+    },
+    resize() {}   // 구글 지도는 크기 변화를 스스로 알아채요
+  };
+}
+
+// 구글 지도 도구를 인터넷에서 불러오기 (한 번만)
+let googleMapsPromise = null;
+function loadGoogleMaps(key) {
+  if (!googleMapsPromise) {
+    googleMapsPromise = new Promise((resolve, reject) => {
+      if (window.google && window.google.maps && window.google.maps.marker) { resolve(); return; }
+      window.__gipMapsReady = () => resolve();
+      const s = document.createElement('script');
+      s.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(key) +
+        '&v=weekly&loading=async&libraries=marker&language=ko&callback=__gipMapsReady';
+      s.async = true;
+      s.onerror = reject;
+      document.head.appendChild(s);
+      setTimeout(() => reject(new Error('timeout')), 15000);
+    });
+  }
+  return googleMapsPromise;
+}
+// 키가 잘못됐거나 이 주소에서 쓸 수 없는 키면 구글이 이 함수를 불러요 → 기본 지도로 바꿔요
+window.gm_authFailure = () => useLeaflet('구글 지도 키를 쓸 수 없어서 기본 지도로 보여 드려요');
+
+function useLeaflet(note) {
+  if (mapView && mapView.kind === 'leaflet') return;
+  mapView = null;
+  mapEl.innerHTML = '';
+  mapEl.removeAttribute('style');
+  if (!window.L) { document.getElementById('mapMsg').hidden = false; return; }
+  mapView = makeLeafletView();
+  if (note) console.warn(note);
+  afterMapReady();
+}
+function afterMapReady() {
+  mapFitted = false;
+  renderMarkers();
+  if (pickLatLng) setPick(pickLatLng);
+  setTimeout(() => { if (mapView) { mapView.resize(); fitIfNeeded(); } }, 0);
+}
+function fitIfNeeded() {
+  const pts = trips.filter(t => t.lat != null).map(t => ({ lat: t.lat, lng: t.lng }));
+  if (!mapFitted && pts.length) mapView.fit(pts);
+  mapFitted = true;
+}
+
+function initMap() {
+  if (mapView || mapLoading) return;
+  const key = ((window.GIP_CONFIG || {}).googleMapsKey || '').trim();
+  // 구글 키는 내 홈페이지 주소에서만 쓸 수 있게 잠가 두니, 파일로 열었을 때는 기본 지도를 써요
+  if (key && location.protocol !== 'file:') {
+    mapLoading = true;
+    loadGoogleMaps(key)
+      .then(() => { if (!mapView) { mapView = makeGoogleView(); afterMapReady(); } })
+      .catch(() => useLeaflet('구글 지도를 불러오지 못해서 기본 지도로 보여 드려요'))
+      .finally(() => { mapLoading = false; });
+    return;
+  }
+  useLeaflet();
 }
 
 function setPick(latlng) {
   pickLatLng = latlng;
   pickHint.textContent = latlng
     ? '📍 위치를 골랐어요 ✓ (지도를 다시 누르면 옮겨져요)'
-    : (map ? '📍 지도를 눌러 위치를 골라 주세요 (안 골라도 저장돼요)' : '');
-  if (!map) return;
-  if (tempMarker) { tempMarker.remove(); tempMarker = null; }
-  if (latlng) tempMarker = L.marker(latlng, { icon: pinIcon(PIN_COLORS.pick), zIndexOffset: 1000 }).addTo(map);
+    : (mapView ? '📍 지도를 눌러 위치를 골라 주세요 (안 골라도 저장돼요)' : '');
+  if (mapView) mapView.setPick(latlng);
 }
 
 function popupNode(t) {
@@ -2114,14 +2247,8 @@ function popupNode(t) {
 }
 
 function renderMarkers() {
-  if (!map) return;
-  Object.values(markers).forEach(m => m.remove());
-  markers = {};
-  trips.filter(t => t.lat != null).forEach(t => {
-    markers[t.id] = L.marker([t.lat, t.lng], { icon: pinIcon(PIN_COLORS[t.status]) })
-      .bindPopup(popupNode(t))
-      .addTo(map);
-  });
+  if (!mapView) return;
+  mapView.setMarkers(trips.filter(t => t.lat != null));
 }
 
 function sortedTrips() {
@@ -2133,14 +2260,9 @@ function sortedTrips() {
 function renderTravel() {
   initMap();
   renderMarkers();
-  if (map) {
+  if (mapView) {
     // 숨겨져 있던 지도가 화면에 나타나면 크기를 다시 계산해야 해요
-    setTimeout(() => {
-      map.invalidateSize();
-      const pts = trips.filter(t => t.lat != null).map(t => [t.lat, t.lng]);
-      if (!mapFitted && pts.length) { map.fitBounds(pts, { padding: [30, 30], maxZoom: 10 }); }
-      mapFitted = true;
-    }, 0);
+    setTimeout(() => { if (mapView) { mapView.resize(); fitIfNeeded(); } }, 0);
   }
 
   const v = trips.filter(t => t.status === 'visited').length;
@@ -2196,10 +2318,9 @@ function renderTravel() {
     });
     // 도장을 누르면 지도에서 그 장소로 이동해요
     li.querySelector('.trip-stamp').addEventListener('click', () => {
-      if (!map || t.lat == null) return;
-      map.getContainer().scrollIntoView({ behavior: 'smooth', block: 'center' });
-      map.flyTo([t.lat, t.lng], 11);
-      markers[t.id].openPopup();
+      if (!mapView || t.lat == null) return;
+      mapEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      mapView.focus(t);
     });
     li.querySelector('[data-act="edit"]').addEventListener('click', () => openTravelForm(t));
     li.querySelector('[data-act="del"]').addEventListener('click', () => {
