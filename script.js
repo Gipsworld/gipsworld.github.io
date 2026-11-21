@@ -2065,7 +2065,8 @@ function tripDates(t) {
 function initMap() {
   if (map) return;
   if (!window.L) { document.getElementById('mapMsg').hidden = false; return; }
-  map = L.map('travelMap', { scrollWheelZoom: false }).setView([36.3, 127.8], 6);
+  // 마우스 휠로 확대/축소 (한 칸에 너무 많이 움직이지 않게 조금 부드럽게)
+  map = L.map('travelMap', { scrollWheelZoom: true, wheelPxPerZoomLevel: 90, zoomSnap: 0.5 }).setView([36.3, 127.8], 6);
   // 지도 그림: OpenStreetMap (예전에 쓰던 CARTO는 이제 키가 있어야 해서 바꿨어요)
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
